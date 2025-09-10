@@ -19,38 +19,41 @@
  */
 const fetchAndMerge = async (urls) => {
   if (!Array.isArray(urls)) {
-    throw new Error('Параметр urls должен быть массивом')
+    throw new TypeError('Параметр urls должен быть массивом');
   }
-  const result = {};
 
-  for (const url of urls) {
-    try {
-
-      const response = await fetch(url);
-      if (!response.ok) continue;
-      
-      const data = await response.json();
-
-      if (typeof data !== 'object' || data === null) {
-        console.warn(`Данные с ${url} не являются объектом`);
-        continue;
-      }
-
-      for (const [key, value] of Object.entries(data)) {
-        if (result[key] === undefined) {
-          result[key] = [value];
-        } else {
-          result[key].push(value);
+  const results = await Promise.all(
+    urls.map(async (url) => {
+      try {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+        
+        const data = await response.json();
+        if (typeof data !== 'object' || data === null) {
+          throw new TypeError('Данные не являются объектом');
         }
+        return data;
+      } catch (error) {
+        throw new Error(`Ошибка при обработке URL ${url}: ${error.message}`);
       }
-    } catch (error) {
-      throw new Error(`Ошибка при обработке URL ${url}: ${error.message}`);
+    })
+  );
+
+  const merged = results.reduce((acc, data) => {
+    for (const key in data) {
+      const value = data[key];
+      if (acc[key] === undefined) {
+        acc[key] = [value];
+      } else {
+        acc[key].push(value);
+      }
     }
-  }
-  
-  for (const key in result) {
-    result[key] = [...new Set(result[key])];
+    return acc;
+  }, {});
+
+  for (const key in merged) {
+    merged[key] = [...new Set(merged[key])];
   }
 
-  return result;
+  return merged;
 };
